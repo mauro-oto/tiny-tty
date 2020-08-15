@@ -50,6 +50,10 @@ class LowrezOutputs
     @args.render_target(:lowrez).sprites
   end
 
+  def static_sprites
+    @args.render_target(:lowrez).static_sprites
+  end
+
   def labels
     @args.render_target(:lowrez).labels
   end

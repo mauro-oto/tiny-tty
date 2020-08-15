@@ -8,9 +8,10 @@ DIFFICULTIES     = {
   easy: 4.0 * 60,
   medium: 3.0 * 60,
   hard: 2.0 * 60,
-  very_hard: 1 * 60,
-  impossible: 0.75 * 60,
-  inferno: 0.5 * 60,
+  very_hard: 1.5 * 60,
+  impossible: 1 * 60,
+  inferno: 0.75 * 60,
+  hell: 0.6 * 60,
 }
 DIFFICULTY_SCORE = {
   easy: 1,
@@ -19,6 +20,7 @@ DIFFICULTY_SCORE = {
   very_hard: 4,
   impossible: 5,
   inferno: 6,
+  hell: 7,
 }
 
 def tick args
@@ -38,13 +40,13 @@ end
 
 def background_image args
   if args.state.wrong_key
-    args.lowrez.sprites << {
+    args.lowrez.static_sprites << {
       w: 64,
       h: 64,
       path: "sprites/pc-background-inverted-glitch.png",
     }
   else
-    args.lowrez.sprites << {
+    args.lowrez.static_sprites << {
       w: 64,
       h: 64,
       path: "sprites/pc-background-lavender.png",
@@ -56,6 +58,8 @@ def init_state args
   args.state.wrong_key ||= false
   args.state.score ||= 0
   args.state.player_name ||= ""
+  args.state.leader_fetch ||= nil
+  args.state.leaders ||= []
 end
 
 def main_loop args
@@ -77,7 +81,7 @@ def main_loop args
 
   case args.state.screen
   when :title
-    args.lowrez.sprites << {
+    args.lowrez.static_sprites << {
       x: 12,
       y: 31,
       w: 40,
@@ -99,7 +103,7 @@ def main_loop args
                             r: 153, g: 229, b: 80, a: 255,
                             font: "fonts/pixel-4x5.ttf" }
   when :instructions
-    args.lowrez.sprites << {
+    args.lowrez.static_sprites << {
       x: 12,
       y: 31,
       w: 40,
@@ -141,14 +145,34 @@ def main_loop args
                             font: "fonts/lowrez.ttf" }
     end
   when :leaderboard
-    args.lowrez.labels << { x: 8, y: 52, text: "1. #{current_player_name(args)}:",
-                            size_enum: LOWREZ_FONT_SM, alignment_enum: 0,
-                            r: 153, g: 229, b: 80, a: 255,
-                            font: "fonts/pixel-4x5.ttf" }
-    args.lowrez.labels << { x: 17, y: 45, text: "#{args.state.score}",
-                            size_enum: LOWREZ_FONT_SM, alignment_enum: 0,
-                            r: 153, g: 229, b: 80, a: 255,
-                            font: "fonts/pixel-4x5.ttf" }
+    if args.state.leader_post[:complete]
+      if args.state.leader_fetch.nil?
+        args.state.leader_fetch = $gtk.http_get "https://tiny-tty-server.herokuapp.com"
+      end
+
+      if !args.state.leader_fetch.nil?
+        if args.state.leader_fetch[:complete]
+          if args.state.leader_fetch[:http_response_code] == 200
+            args.state.leaders = args.state.leader_fetch[:response_data].split("\n")
+            args.state.leader_fetch = nil
+            args.state.leader_post = nil
+          end
+        end
+      end
+    end
+
+
+    args.state.leaders.each_with_index do |leader, i|
+      leader_name, leader_score = leader.split(": ")
+      args.lowrez.labels << { x: 8, y: 52 - (14*i), text: "#{i+1}. #{leader_name}:",
+                              size_enum: LOWREZ_FONT_SM, alignment_enum: 0,
+                              r: 153, g: 229, b: 80, a: 255,
+                              font: "fonts/pixel-4x5.ttf" }
+      args.lowrez.labels << { x: 17, y: 45 - (14*i), text: "#{leader_score}",
+                              size_enum: LOWREZ_FONT_SM, alignment_enum: 0,
+                              r: 153, g: 229, b: 80, a: 255,
+                              font: "fonts/pixel-4x5.ttf" }
+    end
   when :game_over
     args.state.wrong_key = false
 
@@ -157,11 +181,11 @@ def main_loop args
     end
 
     if args.state.player_name.length == 5
-      $gtk.http_get "https://tiny-tty-server.herokuapp.com/save_score/#{args.state.player_name}/#{args.state.score}"
+      args.state.leader_post = $gtk.http_get "https://tiny-tty-server.herokuapp.com/save_score/#{args.state.player_name}/#{args.state.score}"
       args.state.screen = :leaderboard
     end
 
-    args.lowrez.sprites << {
+    args.lowrez.static_sprites << {
       x: 12,
       y: 31,
       w: 40,
@@ -190,23 +214,26 @@ def main_loop args
     end
 
     args.state.difficulty ||= :easy
-    args.state.upper_barrier ||= (100..110).to_a.sample
+    args.state.upper_barrier ||= (110..120).to_a.sample
+    args.state.second_upper_barrier ||= (140..150).to_a.sample
 
     # This calculates where the upper line should be, ratio between the lower
     # BOTTOM_Y and the upper TOP_Y
     case args.state.correct_keys
-    when 0..10
+    when 0..5
       args.state.difficulty = :easy
-    when 10..25
+    when 5..20
       args.state.difficulty = :medium
-    when 25..50
+    when 20..50
       args.state.difficulty = :hard
     when 50..75
       args.state.difficulty = :very_hard
     when 75..args.state.upper_barrier
       args.state.difficulty = :impossible
-    else
+    when args.state.upper_barrier..args.state.second_upper_barrier
       args.state.difficulty = :inferno
+    else
+      args.state.difficulty = :hell
     end
 
     ratio_done = args.state.time_passed / DIFFICULTIES[args.state.difficulty]
@@ -300,6 +327,11 @@ def reset_game_state(args, force = false)
     args.state.score = 0
     args.state.difficulty = :easy
     args.state.player_name = ""
+    args.state.leaders = []
+    args.state.leader_fetch = nil
+  elsif args.inputs.keyboard.key_down.space!
+    args.state.leader_post = { complete: true } # stub POST of score
+    args.state.screen = :leaderboard
   end
 end
 
