@@ -5,9 +5,9 @@ ALLOWED_KEYS     = ("a".."z").to_a - DISALLOWED_KEYS
 BOTTOM_Y         = 8
 TOP_Y            = 55
 DIFFICULTIES     = {
-  easy: 4.0 * 60,
-  medium: 3.0 * 60,
-  hard: 2.0 * 60,
+  easy: 4 * 60,
+  medium: 3 * 60,
+  hard: 2 * 60,
   very_hard: 1.5 * 60,
   impossible: 1 * 60,
   inferno: 0.75 * 60,
@@ -24,11 +24,13 @@ DIFFICULTY_SCORE = {
 }
 
 def tick args
-  args.lowrez.background_color = [255, 255, 255]
+  args.lowrez.background_color = [91, 110, 225]
+  # args.lowrez.background_color = [255,255,255]
 
   background_image args
   init_state args
 
+  show_intro? args
   show_title? args
   show_instructions? args
   reset_game_state args
@@ -60,26 +62,32 @@ def init_state args
   args.state.player_name ||= ""
   args.state.leader_fetch ||= nil
   args.state.leaders ||= []
+  args.state.prefetch ||= $gtk.http_get "https://tiny-tty-server.herokuapp.com"
 end
 
 def main_loop args
-  # args.state.flames ||= []
-
-  # args.lowrez.sprites << args.state.flames.map do |p|
-  #   [(6..31).to_a.sample, (9..54).to_a.sample, 3, 3,
-  #   'sprites/flame.png', 0,
-  #   255 * 1].sprite
-  # end
-
-  # args.lowrez.sprites << args.state.flames.map do |p|
-  #   [(32..58).to_a.sample, (9..54).to_a.sample, 3, 3,
-  #   'sprites/flame.png', 0,
-  #   255 * 1].sprite
-  # end
-
-  # args.state.flames.clear if args.state.flames.all?(&:old?)
-
   case args.state.screen
+  when :intro
+    args.state.logo_y ||= 18
+    args.state.logo_a ||= 0
+    args.lowrez.static_sprites << {
+      x: 12,
+      y: args.state.logo_y,
+      w: 40,
+      h: 24,
+      path: "sprites/logo.png",
+      a: args.state.logo_a,
+    }
+    if args.state.logo_a < 255
+      args.state.logo_a += 5.1
+    end
+    if args.state.tick_count > 90 && args.state.logo_y <= 30
+      args.state.logo_y += 1
+    end
+
+    if args.state.logo_y == 31
+      args.state.screen = :title
+    end
   when :title
     args.lowrez.static_sprites << {
       x: 12,
@@ -110,17 +118,17 @@ def main_loop args
       h: 24,
       path: "sprites/logo.png",
     }
-    args.lowrez.labels << { x: 33, y: 30, text: "enter the",
+    args.lowrez.labels << { x: 33, y: 30, text: "and enter",
                             size_enum: LOWREZ_FONT_SM, alignment_enum: 1,
                             r: 153, g: 229, b: 80, a: 255,
                             font: "fonts/pixel-4x5.ttf" }
 
-    args.lowrez.labels << { x: 33, y: 23, text: "keys in",
+    args.lowrez.labels << { x: 33, y: 23, text: "the keys",
                             size_enum: LOWREZ_FONT_SM, alignment_enum: 1,
                             r: 153, g: 229, b: 80, a: 255,
                             font: "fonts/pixel-4x5.ttf" }
 
-    args.lowrez.labels << { x: 33, y: 16, text: "sequence",
+    args.lowrez.labels << { x: 33, y: 16, text: "you see",
                             size_enum: LOWREZ_FONT_SM, alignment_enum: 1,
                             r: 153, g: 229, b: 80, a: 255,
                             font: "fonts/pixel-4x5.ttf" }
@@ -130,19 +138,35 @@ def main_loop args
                             size_enum: 1.5, alignment_enum: 0,
                             r: 0, g: 0, b: 0, a: 255,
                             font: "fonts/pixel-4x5.ttf" }
-      args.lowrez.labels << { x: 7, y: 53, text: "score: #{args.state.score}",
+      args.lowrez.labels << { x: 7, y: 53, text: "score: ",
                             size_enum: LOWREZ_FONT_SM, alignment_enum: 0,
                             r: 0, g: 0, b: 0, a: 255,
                             font: "fonts/lowrez.ttf" }
+      args.lowrez.labels << { x: 30, y: 53, text: "#{args.state.score}",
+                            size_enum: LOWREZ_FONT_SM, alignment_enum: 0,
+                            r: 0, g: 0, b: 0, a: 255,
+                            font: "fonts/pixel-4x5.ttf" }
+      args.lowrez.labels << { x: 7, y: 13, text: "#{args.state.difficulty.gsub("_", " ")}",
+                            size_enum: LOWREZ_FONT_SM, alignment_enum: 0,
+                            r: 0, g: 0, b: 0, a: 255,
+                            font: "fonts/pixel-4x5.ttf" }
     else
       args.lowrez.labels << { x: 23, y: 43, text: chosen_key?(args),
                             size_enum: 1.5, alignment_enum: 0,
                             r: 155, g: 173, b: 183, a: 255,
                             font: "fonts/pixel-4x5.ttf" }
-      args.lowrez.labels << { x: 7, y: 53, text: "score: #{args.state.score}",
+      args.lowrez.labels << { x: 7, y: 53, text: "score: ",
                             size_enum: LOWREZ_FONT_SM, alignment_enum: 0,
                             r: 155, g: 173, b: 183, a: 255,
                             font: "fonts/lowrez.ttf" }
+      args.lowrez.labels << { x: 30, y: 53, text: "#{args.state.score}",
+                            size_enum: LOWREZ_FONT_SM, alignment_enum: 0,
+                            r: 153, g: 229, b: 80, a: 255,
+                            font: "fonts/pixel-4x5.ttf" }
+      args.lowrez.labels << { x: 7, y: 13, text: "#{args.state.difficulty.gsub("_", " ")}",
+                            size_enum: LOWREZ_FONT_SM, alignment_enum: 0,
+                            r: 155, g: 173, b: 183, a: 255,
+                            font: "fonts/pixel-4x5.ttf" }
     end
   when :leaderboard
     if args.state.leader_post[:complete]
@@ -161,7 +185,6 @@ def main_loop args
       end
     end
 
-
     args.state.leaders.each_with_index do |leader, i|
       leader_name, leader_score = leader.split(": ")
       args.lowrez.labels << { x: 8, y: 52 - (14*i), text: "#{i+1}. #{leader_name}:",
@@ -178,9 +201,11 @@ def main_loop args
 
     if args.inputs.keyboard.key_down.truthy_keys.length > 0 && args.inputs.keyboard.key_down.truthy_keys[0] == :char && args.inputs.keyboard.key_down.truthy_keys[2].length == 1 && args.state.player_name.length < 5
       args.state.player_name += args.inputs.keyboard.key_down.truthy_keys[2].to_s
+    elsif args.inputs.keyboard.key_down.backspace! && args.state.player_name.length < 5
+      args.state.player_name = args.state.player_name.chop
     end
 
-    if args.state.player_name.length == 5
+    if args.state.player_name.length == 5 || (args.state.player_name.length > 1 && args.inputs.keyboard.key_down.enter!)
       args.state.leader_post = $gtk.http_get "https://tiny-tty-server.herokuapp.com/save_score/#{args.state.player_name}/#{args.state.score}"
       args.state.screen = :leaderboard
     end
@@ -244,7 +269,7 @@ def main_loop args
       if args.state.wrong_key
         args.lowrez.lines << { x: 5, y: x,
                                x2: 58, y2: x,
-                               r: 203, g: 219, b: 252, a: 128 }
+                               r: 203, g: 219, b: 252, a: 140 }
         if (args.state.wrong_key_time + 30) < args.state.tick_count
           args.state.wrong_key = false
           args.state.wrong_key_time = 0
@@ -261,10 +286,6 @@ def main_loop args
       args.state.screen = :game_over
     end
   end
-
-  # args.lowrez.lines << { x: 5, y: 9, x2: 58, y2:  9, r: 203, g: 219, b: 252, a: 255 * 0.8 }
-  # args.lowrez.lines << { x: 5, y: 10, x2: 58, y2:  10, r: 203, g: 219, b: 252, a: 255 * 0.8 }
-  # args.lowrez.lines << { x: 5, y: 11, x2: 58, y2:  11, r: 203, g: 219, b: 252, a: 255 * 0.8 }
 end
 
 def chosen_key?(args)
@@ -275,15 +296,6 @@ def chosen_key?(args)
     args.state.time_passed = 0 # countdown for subsequent keys
     args.state.correct_keys += 1 # countdown for subsequent keys
     args.state.score += DIFFICULTY_SCORE[args.state.difficulty] * 100
-    # 5.times do |n|
-    #   args.state.flames << args.state.new_entity(:flames,
-    #                                  { angle: 360.randomize(:ratio),
-    #                                    speed: 20.randomize(:ratio),
-    #                                    lifetime: 10,
-    #                                    x: 20,
-    #                                    y: 20,
-    #                                    max_alpha: 255 })
-    # end
   elsif @chosen_key && args.inputs.keyboard.key_down.truthy_keys.length > 0 && args.inputs.keyboard.key_down.truthy_keys[0] == :char
     args.state.wrong_key = true
     args.state.wrong_key_time = args.state.tick_count
@@ -306,11 +318,15 @@ def show_instructions?(args)
   end
 end
 
+def show_intro?(args)
+  args.state.screen ||= :intro
+
+  if args.state.screen == :intro && args.inputs.keyboard.key_down.enter!
+    args.state.screen = :title
+  end
+end
+
 def show_title?(args)
-  args.state.screen ||= :title
-
-  args.lowrez.solids << { x: 7, y: 7, w: 4, h: 4, r: 255, g: 0, b: 0 }
-
   if args.state.screen == :title && args.inputs.keyboard.key_down.enter!
     args.state.screen = :instructions
   end
@@ -319,7 +335,7 @@ end
 def reset_game_state(args, force = false)
   if args.inputs.keyboard.key_down.escape! || force == true
     @chosen_key = nil
-    args.state.screen = :title
+    args.state.screen = :intro
     args.state.time_passed = 0
     args.state.correct_keys = 0
     args.state.wrong_key = false
@@ -329,7 +345,7 @@ def reset_game_state(args, force = false)
     args.state.player_name = ""
     args.state.leaders = []
     args.state.leader_fetch = nil
-  elsif args.inputs.keyboard.key_down.space!
+  elsif args.inputs.keyboard.key_down.space! && args.state.screen != :game && args.state.screen != :game_over
     args.state.leader_post = { complete: true } # stub POST of score
     args.state.screen = :leaderboard
   end
