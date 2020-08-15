@@ -22,7 +22,6 @@ DIFFICULTY_SCORE = {
 }
 
 def tick args
-  trace! @lowrez
   args.lowrez.background_color = [255, 255, 255]
 
   background_image args
