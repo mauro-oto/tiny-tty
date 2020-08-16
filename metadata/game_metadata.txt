@@ -1,6 +1,6 @@
 devid=mauro-oto
 devtitle=Mauro Otonelli
-gameid=http-test
-gametitle=Tiny TTY (http test)
-version=0.1
+gameid=tiny-tty
+gametitle=Tiny TTY
+version=1.0
 icon=metadata/icon.png

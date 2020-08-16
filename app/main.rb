@@ -25,7 +25,6 @@ DIFFICULTY_SCORE = {
 
 def tick args
   args.lowrez.background_color = [91, 110, 225]
-  # args.lowrez.background_color = [255,255,255]
 
   background_image args
   init_state args
@@ -36,7 +35,6 @@ def tick args
   reset_game_state args
 
   main_loop args
-
   # render_debug args
 end
 
@@ -57,12 +55,16 @@ def background_image args
 end
 
 def init_state args
+  if args.state.tick_count == 0
+    args.outputs.sounds << "sound/tiny-tty-theme.ogg"
+  end
   args.state.wrong_key ||= false
   args.state.score ||= 0
   args.state.player_name ||= ""
   args.state.leader_fetch ||= nil
   args.state.leaders ||= []
   args.state.prefetch ||= $gtk.http_get "https://tiny-tty-server.herokuapp.com"
+  args.state.muted ||= false
 end
 
 def main_loop args
@@ -118,12 +120,12 @@ def main_loop args
       h: 24,
       path: "sprites/logo.png",
     }
-    args.lowrez.labels << { x: 33, y: 30, text: "and enter",
+    args.lowrez.labels << { x: 33, y: 30, text: "enter",
                             size_enum: LOWREZ_FONT_SM, alignment_enum: 1,
                             r: 153, g: 229, b: 80, a: 255,
                             font: "fonts/pixel-4x5.ttf" }
 
-    args.lowrez.labels << { x: 33, y: 23, text: "the keys",
+    args.lowrez.labels << { x: 33, y: 23, text: "the letters",
                             size_enum: LOWREZ_FONT_SM, alignment_enum: 1,
                             r: 153, g: 229, b: 80, a: 255,
                             font: "fonts/pixel-4x5.ttf" }
@@ -282,7 +284,6 @@ def main_loop args
     end
 
     if ratio_done >= 1
-      # reset_game_state(args, true)
       args.state.screen = :game_over
     end
   end
@@ -296,12 +297,14 @@ def chosen_key?(args)
     args.state.time_passed = 0 # countdown for subsequent keys
     args.state.correct_keys += 1 # countdown for subsequent keys
     args.state.score += DIFFICULTY_SCORE[args.state.difficulty] * 100
+    args.gtk.queue_sound "sound/g5drum.ogg" if !args.state.muted
   elsif @chosen_key && args.inputs.keyboard.key_down.truthy_keys.length > 0 && args.inputs.keyboard.key_down.truthy_keys[0] == :char
     args.state.wrong_key = true
     args.state.wrong_key_time = args.state.tick_count
     if args.state.score > 0
       args.state.score -= DIFFICULTY_SCORE[args.state.difficulty] * 100
     end
+    args.gtk.queue_sound "sound/c5drum.ogg" if !args.state.muted
   end
 
   @chosen_key ||= ALLOWED_KEYS.sample
@@ -348,6 +351,10 @@ def reset_game_state(args, force = false)
   elsif args.inputs.keyboard.key_down.space! && args.state.screen != :game && args.state.screen != :game_over
     args.state.leader_post = { complete: true } # stub POST of score
     args.state.screen = :leaderboard
+  elsif args.inputs.keyboard.key_down.m && args.state.screen != :game && args.state.screen != :game_over
+    args.gtk.stop_music
+    args.state.muted = !args.state.muted
+    args.outputs.sounds << "sound/tiny-tty-theme.ogg" if !args.state.muted
   end
 end
 
